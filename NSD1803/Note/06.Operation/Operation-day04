@@ -1,0 +1,241 @@
+nginx代理：
+	代理HTTP（web服务器）
+	1.9以上才支持（Stream模块）TCP或UDP代理
+调度器：
+TCP
+	stream {
+		upstream mysqls{
+			server 1.1.1.1:3306;
+			server 2.2.2.2:3306;
+			}
+	server {
+		listen 3306;
+		proxy_pass mysqls;
+		}
+		}
+HTTP:
+	http{
+	upstream webs {
+		server 10.10.10.10:80;
+		server 20.20.20.20:80;
+		}
+	server {
+		listen 80;
+		server_name localhost;
+		proxy_pass http://webs;
+		}
+	}
+weight权重
+max_fails   fail_timeout
+ip_hash
+
+并发  测试高并发 ab -n 2000 -c 2000 http://192.168.4.5
+nginx.conf,  『worker_processes 2(cpu核心数),wroker_connections 65535(每个worker最大并发连接数)』
+linux内核 # ulimit -a //查看所有属性    ulimit -Hn 1000 //设置硬限制   ulimit -Sn 10000 //设置软限制
+	永久修改 vim /etc/security/limit.conf    	软比硬小
+	*	soft  nofile	10000
+	*	hard	nofile	10000	
+	#用户或组    硬限制或软限制    需要限制的项目   限制的值
+
+buffer缓存\数据包头部缓存大小，修改配置 /usr/local/nginx/conf/nginx.conf
+	打开修改
+	client_header_buffer_size    1k;        //默认请求包头信息的缓存    
+	large_client_header_buffers  4 4k;        //大请求包头部信息的缓存个数与容量
+
+修改Nginx配置文件，定义对静态页面的缓存时间 /usr/local/nginx/conf/nginx.conf
+	在写一条location
+	location ～* \.(jpg|gif|png)$ {
+	expires 30d;   //定义客户端缓存时间为30天	
+		}
+
+自定义报错页面 /usr/local/nginx/conf/nginx.conf	/usr/local/nginx/html/40x.html
+	error_page 404 /40x.html;	//自定义错误页面
+
+http 状态码   2开头代表正常、3开头代表（重定向）、4开头代表（请求错误）、5开头代表服务器出问题
+	200（一切正常）301（永久重定向）302（临时重定向）401（用户名或密码错误）403（禁止访问客户端被拒绝）
+	404（文件不存在）414（请求URI头部过长）500（服务器内部错误）502（Bad Gateway）
+
+查看服务器状态信息
+	编译安装时使用  --with-http_stup_status_module 开启状态页面模块
+	修改配置文件 /usr/local/nginx/conf/nginx.conf 
+	location /status {
+			stub_status on;
+		}
+	curl http://192.168.4.5/status 查看状态信息
+	Active connections：当前活动的连接数量。
+	Accepts：已经接受客户端的连接总数量。
+	Handled：已经处理客户端的连接总数量（一般与accepts一致，除非服务器限制了连接数量）。
+	Requests：客户端发送的请求数量。
+	Reading：当前服务器正在读取客户端请求头的数量。
+	Writing：当前服务器正在写响应信息的数量。
+	Waiting：当前多少客户端在等待服务器的响应。
+
+对页面进行压缩处理
+	修改配置文件 /usr/local/nginx/conf/nginx.conf
+	http{
+	gzip on;		 //开启压缩
+	gzip_min_length 1000;	//小文件不压缩
+	gzip_comp_level 4;	//压缩比率  最高为10
+	gzip_types text/plain text/css application/json application/x-javascript text/xml 		application/xml application/xml+rss text/javascript;	//对特定文件压缩，类型参考mime.types
+	}
+
+服务器内存缓存
+	修改配置文件 /usr/local/nginx/conf/nginx.conf
+	http{
+	open_file_cache	max=2000 inactive=20s;	
+		open_file_cache_valid 60s;	
+		open_file_cache_min_uses 5;
+		open_file_cache_errors off;
+	}
+	//设置服务器最大缓存2000个文件句柄，关闭20秒内无请求的文件句柄
+	//文件句柄的有效时间是60秒，60秒后过期
+	//只有访问次数超过5次会被缓存
+
+###############################################################################################
+
+传统Web架构的问题
+许多Web应用都将数据保存到RDBMS中，应用服务器从中读取数据并在浏览器中显示
+随着数据量的增大、访问的集中、就会出现RDBMS的负担加重、数据库响应恶化、网站显示延迟等重大影响
+数据位置对比
+性能	CPU缓存>内存>磁盘>数据库
+价格	CPU缓存>内存>磁盘>数据库
+
+memcached原理
+nosql（缓存数据库）重启就没了
+数据库（方便查询）（一般放字符）
+
+构建memcached服务
+	使用yum安装软件包memcached
+	# systemctl  start  memcached
+使用telnet访问memcached服务器
+	# yum -y install telnet
+使用telnet连接服务器测试memcached服务器功能，包括增、删、改、查等操作。
+	# telnet  192.168.4.5  11211
+	Trying 192.168.4.5...
+	……
+	##提示：0表示不压缩，180为数据缓存时间，3为需要存储的数据字节数量。
+	set name 0 180 3                //定义变量，变量名称为name
+	plj                            //输入变量的值，值为plj                
+	STORED
+	get name                        //获取变量的值
+	VALUE name 0 3                 //输出结果
+	plj
+	END
+	##提示：0表示不压缩，180为数据缓存时间，3为需要存储的数据字节数量。
+	add myname 0 180 10            //新建，myname不存在则添加，存在则报错
+	set myname 0 180 10            //添加或替换变量
+	replace myname 0 180 10        //替换，如果myname不存在则报错
+	get myname                    //读取变量
+	append myname 0 180 10        //向变量中追加数据
+	delete myname                    //删除变量
+	stats                        //查看状态
+	flush_all                        //清空所有
+	quit                            //退出登录                                  
+
+LNMP+memcached
+
+
+使用PHP语言测试memcached服务
+步骤一：部署LNMP环境
+步骤二：启动服务
+步骤三：创建PHP页面，使用PHP语言测试memcached服务
+	1）部署测试页面
+	创建PHP首页文档/usr/local/nginx/html/index.php，测试页面可以参考lnmp_soft/php_scripts/mem.php：
+	# vim /usr/local/nginx/html/test.php
+	<?php
+	$memcache=new Memcache;                //创建memcache对象
+	$memcache->connect('localhost',11211) or die ('could not connect!!');
+	$memcache->set('key','test');             //定义变量
+	$get_values=$memcache->get('key');        //获取变量值
+	echo $get_values;
+	?>
+	2)为PHP添加memcache扩展
+	# yum -y install  php-pecl-memcache
+	# systemctl restart php-fpm
+
+##############################################################################################
+
+PHP的本地Session信息
+步骤一：部署后端LNMP服务器相关软件
+	修改Nginx配置文件（修改默认首页与动静分离）
+	# vim /usr/local/nginx/conf/nginx.conf
+	location / {
+	            root   html;
+	            index  index.php  index.html   index.htm;
+	        }
+	 location  ~  \.php$  {
+	            root           html;
+	            fastcgi_pass   127.0.0.1:9000;
+	            fastcgi_index  index.php;
+     # fastcgi_param SCRIPT_FILENAME  $document_root$fastcgi_script_name;
+            include        fastcgi.conf;
+        }
+步骤二：启动LNMP服务器相关的服务(mariadb php-fpm )
+步骤三：部署前端Nginx调度服务器
+	修改Nginx配置文件
+	# vim /usr/local/nginx/conf/nginx.conf
+	.. ..
+	upstream webs  {
+	        server 192.168.2.100:80;
+	        server 192.168.2.200:80;
+	  }
+	 server  {
+	          listen       80;
+	          server_name  localhost;
+	          location  /  {
+	              proxy_pass http://webs;
+	            root   html;
+	            index  index.php index.html index.htm;
+	          }
+	}
+	重新加载配置文件
+步骤四：测试环境是否配置成功
+	# curl  http://192.168.4.5/index.html        //查看是否有数据
+步骤五：部署测试页面(web1和web2)
+	1）部署测试页面(Web1服务器）。
+	测试页面可以参考lnmp_soft/php_scripts/php-memcached-demo.tar.gz。
+	[root@web1 ~]# cd lnmp_soft/php_scripts/
+	[root@web1 php_scripts]# tar -xf php-memcached-demo.tar.gz
+	[root@web1 php_scripts]# cd php-memcached-demo
+	[root@web1 php-memcached-demo]# cp -a  *  /usr/local/nginx/html/
+	2）浏览器直接访问后端服务器的测试页面（Web1服务器）。
+	[root@web1 ~]# firefox http://192.168.2.100            //填写账户信息
+	[root@web1 ~]# cd /var/lib/php/session/  //查看服务器本地的Session信息
+	[root@web1 ~]# ls
+	sess_ahilcq9bguot0vqsjtd84k7244          //注意这里的ID是随机的
+	[root@web1 ~]# cat sess_ahilcq9bguot0vqsjtd84k7244
+	浏览器访问前端调度器测试（不同后端服务器Session不一致）。
+	推荐使用google浏览器测试。
+	[root@client ~]# google-chrome http://192.168.4.5
+	//填写注册信息后，刷新，还需要再次注册，说明两台计算机使用的是本地Session
+	//第二台主机并不知道你再第一台主机已经登录，第一台主机的登录信息也没有传递给第二台主机
+
+PHP实现session共享
+步骤一：构建memcached服务
+	(装包memcache起服务)
+步骤二：在后端LNMP服务器上部署Session共享
+	1)为PHP添加memcache扩展
+	# yum -y install  php-pecl-memcache
+	2）修改PHP-FPM配置文件，并重启服务
+	[root@web1 ~]# vim  /etc/php-fpm.d/www.conf            //修改该配置文件的两个参数
+	//文件的最后2行
+	修改前效果如下:
+	php_value[session.save_handler] = files
+	php_value[session.save_path] = /var/lib/php/session
+	//原始文件，默认定义Sessoin会话信息本地计算机（默认在/var/lib/php/session）
+	修改后效果如下:
+	php_value[session.save_handler] = memcache
+	php_value[session.save_path] = "tcp://192.168.2.5:11211"
+	//定义Session信息存储在公共的memcached服务器上，主机参数中为memcache（没有d）
+	//通过path参数定义公共的memcached服务器在哪（服务器的IP和端口）
+	[root@web1 ~]# systemctl  restart  php-fpm
+步骤三：客户端测试
+	客户端使用浏览器访问两台不同的Web服务器。
+	操作步骤与练习三一致，最终可以获得相关的Session ID信息。
+
+
+
+
+
+
+

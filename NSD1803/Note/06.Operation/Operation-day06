@@ -1,0 +1,676 @@
+Operation Day06
+Subversion
+什么是Subversion
+Subversion 是一个自由/开源的版本控制系统
+--在Subversion管理下，文件和目录可以超越时空
+--Subversion允许你数据恢复到早期版本
+--或者是检查数据修改的历史
+--许多人将版本控制系统当作一种神奇的时间机器
+--允许你和别人协作文档并跟踪所做的修改
+
+Subversion架构
+客户端
+--命令行
+--图形
+通信方式
+--本地访问
+--SVN服务器
+--Web服务
+
+基本概念
+版本库
+典型的客户/服务器系统
+--版本库是版本控制的核心
+--任意数量客户端
+--客户端通过写数据库分享代码
+Subversion特点
+--记录每一次改变
+锁定--修改--解锁的问题
+--锁定可能导致管理问题
+A锁定文件后忘记解锁等问题
+--锁定导致不必要的串行开发
+A想修改一个文件的开始，B想修改一个文件的结尾 如果能进行正确的合并，则可以更轻松的工作，没必要轮流工作
+Subversion控制系统使用拷贝--修改--合并模型
+--每个客户连接版本库，并建立个人工作副本
+--用户并行工作，修改自己的副本
+--最终，合并版本!
+--个别冲突问题，需要认为手动解决
+流程
+--Harry拷贝副本，Sally拷贝副本
+--Harty修改A1，Sally修改A2
+--Harry上传A1后，Sally上传A2，会提示Sally的文件已过期
+--Sally更新文件（合并）后上传新的A3
+
+服务器设置
+安装Subversion
+	# yum -y install subversion
+	# rpm -q subversion
+创建版本库
+利用svnadmin命令可创建服务器版本库
+--subversion版本库管理工具，帮助：svnadmin help
+--用法：svnadmin 命令 /版本库路径 [选项]
+--命令：create  创建一个新的版本库
+	# mkdir /var/svn
+	# svnadmin create /var/svn/project1
+	# svnadmin create /var/svn/project2
+	# svnadmin create /var/svn/devel
+导入项目代码
+使用svn命令将项目代码导入版本库中
+-- import指令执行导入操作
+-- —m选项设置注释性的字符串
+	# cd /usr/lib/systemd/system
+	# svn import./ file:///var/svn/project1 -m""lnit"
+认证与授权
+使用SVN内置的认证机制可以有效的增强客户端访问版本库的安全性
+--当客户端访问版本库服务器时，服务器会根据版本库目录下的conf/svnserve.conf文件中定义的认证与授权策略实现权限的控制
+使用SVN内置的认证机制可以有效的增强客户端访问版本库的安全性
+	# cat /var/svn/web_project/conf/svnserve.conf
+[general]
+anon-access=none
+//设置拒绝匿名账户访问，此处可以设置为none、read、write
+auth-access=write
+//经过认证的账户权限为可写权限
+passwd-db=passwd
+//账户名称与密码的存放文件名，该文件在conf目录下
+authz-db=authz
+//基于路径的访问控制文件名（可以对文件或目录设置权限）
+在passwd文件中需要设置账户信息
+在authz文件中需要设置访问控制权限
+	# cat /var/svn/web_project/conf/passwd
+[users]
+harry=harryssecret  	//用户名为harry，密码为harryssecret
+sally=sallyssecret	//用户名为sally，密码为sallyssecret
+	# cat /var/svn/web_project/conf/authz
+[groups]
+admins=harry,sally	//定义组，组成员有harry与sally
+[/]				//根路径设置权限，也可以设置其他路径
+@admins=rw			//admin组中的用户可读可写权限
+*=r				//其他所有的人只读
+				//权限列表：只读（‘r’）读写（‘rw’）无权限（‘’）
+svnserve服务
+svnserve命令即可启动SVN服务进程
+-- —d				//以守护进程方式运行svnserve
+-- —listen-port=port	//监听的端口，默认端口号为3690
+-- —r root     		//设置一个虚拟路径，默认客户端要指定绝对路径访问库
+	# svnserve -d -r /var/svn/project1	//共享单个仓库
+	# svnserve -d				//共享所有仓库
+访问方式
+本地磁盘
+SVN
+Web
+	URL格式				含义
+file：//			直接访问本地磁盘上的版本库（客户端与服务器端在一台机器上）
+http：//			配置Apache的WebDAV协议，通过网页访问版本库
+https：//			与http：//相似，但使用了SSL进行数据加密
+svn：//			通过svnserve定义的协议访问版本库
+svn+ssh：//			与svn：//相似，但使用了SSH封装加密数据
+客户端命令行工具
+svn命令[选项]
+-- —passwd		密码
+-- —username	用户名
+-- —revision（-r）	指定要检查的特定版本
+checkout命令（初始化检出）
+--chenkout URL [PATH]
+--从服务器版本库中复制一份副本至本地
+--URL定位版本库
+--PATH为本地工作副本路径
+	# cd /tmp/
+	# svn so svn://10.47.214.131/ code
+commit命令（提交修改）
+--在本地修改本地副本中的代码后，commit可以提交该修改，原子事务提交
+update命令
+--将服务器上其他人的修改的代码更新到本地
+	# svn ci -m "node"
+	# svn update
+查看版本库信息
+--info命令		//查看版本仓库信息
+--log命令		//查看版本修改历史
+	# svn info svn://192.168.2.100/
+	# svn	log  svn://192.168.2.100/
+add命令（本地版本库添加新文件）
+--在本地版本库副本，添加新的文件
+--注意，add不会自动提交版本库服务器
+--需要使用commit命令提交服务器
+	# echo "echo test" > test.sh
+	# svn add test.sh
+	# svn list svn://192.168.2.100/	//服务器无test.tst文件
+	# svn ci -m "addtest file"
+	# svn list svn://192.168.2.100/ 	//服务器有test.txt文件
+del、rm命令（本地版本库删除文件）
+--删除本地版本库副本文件
+--注意，del不会自动提交版本库服务器
+--需要使用commit命令提交服务器
+	# svn rm test.sh
+	# svn ci -m "delete test.sh"
+mkdir命令（本地版本库创建阿目录）
+--在本地版本库副本，添加新目录
+	# svn mkdir test
+	# svn add abc.txt
+	# svn ci -m "mkdir and add file"
+diff 命令（数据对比）
+--对比本地副本与服务器数据
+	# echo "add test file" > killall
+	# svn diff killall		//对比单个文件
+	# svn diff 				//对比所有文件
+cat命令
+-- 查看版本库数据的内容
+--本地副本可以直接cat查看
+	# svn cat killall
+版本回滚
+--revert命令
+	本地副本修改后，但未commit提交修改时回滚数据
+--merge命令
+	本地副本修改connit提交后，使用该命令回滚
+	# sed -i '1d' killall
+	# head killall
+	# svn revert killall
+	# head killall
+	# sed -i '1d' netfs
+	# svn ci -m "modify netf"
+	# svn merge -r 10:5 netfs	//将netfs从10版本还原回5版本
+
+Subversion基本操作
+本案例要求先快速搭建好一台Subversion服务器，并测试该版本控制软件：
+创建版本库
+导入初始化数据
+检出数据至用户本地副本
+对本地副本进行增删改查等操作
+
+方案
+使用YUM安装subversion软件，使用svn客户端工具连接svnserver服务器并测试版本控制软件。
+
+安装Subversion服务器
+1）YUM安装subversion软件
+	# yum -y install subversion
+	# rpm -q subversion
+2)创建版本库
+	# mkdir /var/svn/ 
+	# svnadmin create /var/svn/project
+	# ls /var/svn/project/
+conf/  db/  format  hooks/  locks/  README.txt
+3）本地导入初始化数据
+	# cd /usr/lib/systemd/system/ 
+	# svn import . file:///var/svn/project/ -m "Init Data"
+4）修改配置文件，创建账户与密码
+	# vim /var/svn/project/conf/svnserve.conf
+[general]
+### These options control access to the repository for unauthenticated
+### and authenticated users.  Valid values are "write", "read",
+### and "none".  The sample settings below are the defaults.
+anon-access = none
+//19行，匿名无任何权限
+auth-access = write
+//20行，有效账户可写
+### The password-db option controls the location of the password
+### database file.  Unless you specify a path starting with a /,
+### the file's location is relative to the directory containing
+### this configuration file.
+### If SASL is enabled (see below), this file will NOT be used.
+### Uncomment the line below to use the default password file.
+password-db = passwd
+//27行，密码文件
+### The authz-db option controls the location of the authorization
+### rules for path-based access control.  Unless you specify a path
+### starting with a /, the file's location is relative to the the
+### directory containing this file.  If you don't specify an
+### authz-db, no path-based access control is done.
+### Uncomment the line below to use the default authorization file.
+authz-db = authz
+//34行，ACL访问控制列表文件
+### This option specifies the authentication realm of the repository.
+### If two repositories have the same authentication realm, they should
+### have the same password database, and vice versa.  The default realm
+### is repository's uuid.
+# realm = My First Repository
+	# vim /var/svn/project/conf/passwd 
+… …
+[users]
+harry = pass
+//用户名和密码
+tom = pass
+//用户名和密码
+	# cat /var/svn/project/conf/authz 
+[/]                                //定义ACL访问控制
+harry = rw                        //用户对项目根路径可读可写
+tom = rw
+* = r                            //其他人只读
+5）启动服务
+	# svnserve -d  -r /var/svn/project1
+	# netstat -nutlp |grep svnserve
+tcp        0      0 0.0.0.0:3690    0.0.0.0:*    LISTEN      4043/svnserve       
+
+客户端测试(192.168.2.200)
+1）将服务器上的代码下载到本地
+	# cd /tmp
+	# svn --username harry --password pass \
+co svn://192.168.2.100/ code        
+//建立本地副本,从服务器192.168.2.100上co下载代码到本地code目录
+//用户名harry,密码pass
+-----------------------------------------------------------------------
+ATTENTION!  Your password for authentication realm:
+   <svn://127.0.0.1:3690> b72f45f0-bbe5-4a0c-ad4a-37f52704f0b1
+can only be stored to disk unencrypted!  You are advised to configure
+your system so that Subversion can store passwords encrypted, if
+possible.  See the documentation for details.
+You can avoid future appearances of this warning by setting the value
+of the 'store-plaintext-passwords' option to either 'yes' or 'no' in
+'/root/.subversion/servers'.
+-----------------------------------------------------------------------
+Store password unencrypted (yes/no)? yes            //提示是否保存密码
+	# cd /tmp/code
+	# ls
+	# vim user.slice                 //挑选任意文件修改其内容
+	# svn ci -m "modify user"        //将本地修改的数据同步到服务器
+	# svn update                    //将服务器上新的数据同步到本地
+	# svn info     svn://192.168.2.100    //查看版本仓库基本信息
+	# svn log     svn://192.168.2.100    //查看版本仓库的日志
+	# echo "test" > test.sh        //本地新建一个文件
+	# svn ci -m "new file"            //提交失败，该文件不被svn管理
+	# svn add test.sh                //将文件或目录加入版本控制
+	# svn ci -m "new file"            //再次提交，成功
+	# svn mkdir subdir                //创建子目录
+	# svn rm timers.target            //使用svn删除文件
+	# svn ci -m "xxx"                //提交一次代码
+	# vim umount.target            //任意修改本地的一个文件
+	# svn diff                     //查看所有文件的差异
+	# svn diff umount.target        //仅查看某一个文件的差异
+	# svn cat svn://192.168.2.100/reboot.target    //查看服务器文件的内容
+	# sed -i 'd' tmp.mount            
+//删除文件所有内容，但未提交
+	# svn revert tmp.mount            
+//还原tmp.mount文件
+	# rm -rf  *.target                
+//任意删除若干文件
+	# svn update                    
+//还原
+	# sed -i '1a #test###' tuned.service
+//修改本地副本中的代码文件
+	# svn ci  -m  "xxx"
+//提交代码
+	# svn merge -r7:2    tuned.service    
+//将文件从版本7还原到版本2
+使用svn命令测试svnserver服务时可以使用的命令列表。
+			svn命令列表
+	命令				  作用
+   	add				添加文件
+    commit(ci)			提交更新
+    checkout(co)			检出代码
+	cat			   查看代码文件内容
+	del				删除文件
+	diff				文件对比
+	import			导入代码
+	info			     查看版本信息
+	list			     查看文件列表
+	log			     查看版本历史
+	update			  更新
+	mkdir				创建目录
+###############################################################################################
+多人协同案例
+	# yum -y install subversion
+	# mkdir /var/svn
+	# svnadmin create /var/svn/project
+	# cd /var/svn/project/conf
+	# cat svnserve.conf
+[general]
+anon-access = none
+auth-access = write
+password-db = passwd
+authz-db = authz
+	# cat passwd
+[users]
+harry = pass
+tom = pass
+	# vim authz
+[/]
+harry = rw
+tom = rw
+初始化数据
+初始化服务器版本库并启动SVN服务
+	# cd /etc/rc.d/init.d/
+	# svn import file:///var/svn/project/ -m "lnit Data"
+	# service svnserve start
+开发者初始化本地副本(user1和user2两个用户)
+	# cd /var/tmp
+	# svn --username harry --password pass co svn://127.0.0.1/var/svn/project harry
+	# cd /var/tmp
+	# svn --username tom --password pass co svn://127.0.0.1/var/svn/project tom
+修改副本
+Harry修改自己的副本(不同的文件)
+	# cd /var/tmp/harry
+	# sed -i '1a###test####' sshd
+	# svn ci -m "sshd was modified"
+Tom修改自己的副本(不同的文件)
+	# cd /var/tmp/tom
+	# sed -i '1a###test####' atd
+	# svn ci -m "atd was modified"
+Harry修改自己的副本(相同的文件)
+	# cd /var/tmp/harry
+	# sed -i '3a###test###' svnserve
+	# svn ci -m "svnserve add one line test for harry"
+Tom修改自己的副本(相同的文件)
+	# cd /var/tmp/tom
+	# sed -i '5a###test2###' svnserve
+	# svn ci -m "svnserve add one line test for tom"
+Sending  svnserve
+Transmitting file data.svn:Commit failed(details follow):
+svn:File'/svnserve' is out of date
+	# svn update
+	# svn ci -m "svnserve add one line test for tom"
+Harry修改自己的副本(相同的行)
+	# cd /var/tmp/harry
+	# sed -i'1c#!/bin/sh' halt
+	# svn ci -m "harry changed the compiler for halt"
+Tom修改自己的副本(相同的行)
+	# cd /var/tmp/tom
+	# sed -i'1c#!/bin/ksh' halt
+	# svn ci -m "harry changed the compiler for halt"
+	# svn update
+Select:(p)postpone,(df)diff-full,(e)edit,(r)resolved,(mc)mine-conflict,
+	 (tc)theirs-conflict,(s)show all options:
+解决冲突
+update时会提示冲突,需要手动处理
+	# svn update
+Select:(p)postpone,(df)diff-full,(e)edit,(r)resolved,(mc)mine-conflict,
+	 (tc)theirs-conflict,(s)show all options:
+//df			对比不同
+//edit		直接修改文件，修改后选择r
+//mine-conflict	冲突以本地为准
+//theirs-conflict	冲突以服务器为准
+//postpone		标记冲突，稍后解决
+选择postpone标记后，本地副本会多几个文件
+	# ls
+halt			//本地副本文件
+hale.mine		//我的修改版本
+halt.r5		//第五个版本
+halt.r6		//第六个版本
+保留需要的文件覆盖掉halt后，rm删除其他即可
+	# cd /var/tmp/tom
+	# rm-rf halt.r5;rm -rf halt.r6
+	# mv halt.mine halt; chmod+x halt.mine
+	# svn ci -m "harry changed the compiler for halt"
+
+备份与还原
+备份版本库
+使用dump指令备份
+	# svnadmin dump /var/svn/project/ > project.bak
+还原版本库
+使用load指令还原数据
+	# svnadmin crete /var/svn/project2
+	# svnadmin load /var/svn/project2 < project.bak
+
+GitHub
+简介
+GitHub是一个面向开源及私有软件项目的托管平台，因为只支持git 作为唯一的版本库格式进行托管，故名GitHub
+GitHub于2008年4月10日正式上线 
+使用GitHub
+登录网址（https：//github.com/）
+
+使用Subversion协同工作
+
+方案
+使用svn客户端工具连接subversion服务器并测试多人协同工作以及如何手动解决冲突问题，账户名称分别为harry和tom，最后使用svnadmin dump指令对版本库进行备份工作。
+
+多人协同工作
+1）远程连接两个终端，每个人下载代码本地副本，注意web1(192.168.2.100)和web2（192.168.2.200）代表了两个不同的主机，看清楚操作是在哪一台计算机上执行！
+	# cd /tmp
+	# svn --username harry --password pass \
+> co svn://192.168.2.100/project mycode
+	# cd /tmp
+	# svn --username tom --password pass \
+> co svn://192.168.2.100/project mycode
+	# cd mycode
+	# cd mycode
+2) harry和tom修改不同的文件
+	# sed -i "3a ###harry modify#####"  tmp.mount
+	# svn ci -m  "has modified"
+	# sed -i "3a ###tom modify#####"  umount.target
+	# svn ci -m "has modified"
+	# svn update
+	# svn update
+3）harry和tom修改相同文件的不同行
+	# cd harry
+	# sed -i "3a ###harry modify#####" user.slice
+	# svn ci -m  "modified"
+	# sed -i "6a ###tom  modify#####"  user.slice
+	# svn ci -m "modified"        //提交失败
+Sending        svnserve
+Transmitting file data .svn: Commit failed (details follow):
+svn: File '/user.slice' is out of date（过期）
+	# svn update                    //提示失败后，先更新再提交即可
+	# svn ci -m "modified"        //提交成功
+Sending        user.slice
+Transmitting file data .
+4) harry和tom修改相同文件的相同行
+	# sed  -i  '1c [UNIT]' tuned.service
+	# svn ci -m "modified"
+	# sed  -i  '1c [unit]' tuned.service
+	# svn ci -m "modified"
+Sending        tuned.service
+Transmitting file data .svn: Commit failed (details follow):
+svn: File '/tuned.service' is out of date(过期)
+	# svn update                    //出现冲突，需要解决
+Conflict discovered in 'tuned.service'.
+Select: (p) postpone, (df) diff-full, (e) edit,
+        (mc) mine-conflict, (tc) theirs-conflict,
+        (s) show all options:p                    //选择先标记p，随后解决
+	# ls
+tuned.service   tuned.service.mine        tuned.service.r10    tuned.service.r9
+	# mv tuned.service.mine tuned.service
+	# rm  -rf  tuned.service.r10 tuned.service.r9
+	# svn ci -m "modified"    //解决冲突
+
+使用dump指令备份版本库数据
+	# svnadmin dump /var/svn/project > project.bak  //备份
+* Dumped revision 0.
+* Dumped revision 1.
+* Dumped revision 2.
+* Dumped revision 3.
+* Dumped revision 4.
+* Dumped revision 5.
+* Dumped revision 6.
+* Dumped revision 7.
+* Dumped revision 8.
+* Dumped revision 9.
+* Dumped revision 10.
+* Dumped revision 11.
+	# svnadmin load /var/svn/project2 < project.bak      //还原
+###############################################################################################
+RPM打包
+基本概念
+应用场景
+官方未提供RPM包
+官方RPM无法自定义
+大量源码包，希望提供统一的软件管理机制
+
+软件打包
+打包流程
+准备源码软件
+安装rpm-build
+编写编译配置文件
+编译RPM包
+编译打包RPM的命令工具
+	# yum -y install rpm-build
+	# rpmbuild -ba test.spec			//生成rpmbuild目录
+	# ls
+准备源码软件
+将源码包复制到rpmbuild子目录
+	# cp nginx-1.12.2.tar.gz rpmbuild/SOURCES/
+编写编译配置文件
+新建SPEC文件
+	# vim /root/rpmbuild/SPECS/nginx.spec
+Name:hello			//软件名称
+Version:			//软件版本
+Release:1			//RPM版本
+Summary:			//描述
+Group:			//软件组
+Licence:			//协议
+URL:				//网址
+Source0:			//源码文件
+BuildRoot:			//临时编译目录
+新建SPEC文件
+	# vim /root/rpmbuild/SPECS/nginx.spec
+BuildRequires:		//编译时依赖包
+Requires:			//安装时依赖包
+%description		//详细描述
+%prep				//安装前准备，解压
+%setup -q			//系统使用setup自动解压，安静模式
+%build			//编译时需要执行的命令
+make
+%configure			//配置时需要执行的命令
+%install			//安装时需要执行的命令
+新建SPEC文件
+	# vim /root/rpmbuild/SPECS/nginx.spec
+%clean			//清理时需要执行的命令
+%files			//定义打包文件列表
+%changelog			//软件修改历史
+编译RPM包
+使用spec文件编译RPM包
+	# rpmbuild -ba /root/rpmbuild/SPECS/nginx.spec
+安装测试RPM包
+	# rpm -qpi XXX.rpm
+	# rpm -qpl XXX.rpm
+	# rpm -ivh XXX.rpm
+
+制作nginx的RPM包
+3.1 问题
+本案例使用nginx-1.12.2版本的源码软件，生产对应的RPM包软件，具体要求如下：
+软件名称为nginx
+软件版本为1.12.2
+RPM软件包可以查询描述信息
+RPM软件包可以安装及卸载
+
+方案
+安装rpm-build软件包，编写SPEC配置文件，创建新的RPM软件包。
+配置文件中的描述信息：
+SPEC描述信息
+选项				  值
+Name				Nginx
+Version			1.12.2
+Release			1
+Summary			Nginx is a web server software
+License			GPL
+URL				www.nginx.org
+Source0			nginx-1.12.2.tar.gz
+BuildRequires		gcc pcre-devel zlib-devel openssl-devel
+%description		nginx[enginex]is an HTTP and reverse proxy server... ...
+
+安装rpm-build软件
+1）安装rpm-build软件包
+	# yum -y install  rpm-build
+2）生成rpmbuild目录结构
+	# rpmbuild -ba nginx.spec                //会报错，没有文件或目录
+	# ls /root/rpmbuild                    //自动生成的目录结构
+BUILD  BUILDROOT  RPMS  SOURCES  SPECS  SRPMS
+3）准备工作，将源码软件复制到SOURCES目录
+	# cp nginx-1.12.2.tar.gz /root/rpmbuild/SOURCES/
+4）创建并修改SPEC配置文件
+	# vim /root/rpmbuild/SPECS/nginx.spec 
+Name:nginx        
+Version:1.12.0
+Release:    10
+Summary: Nginx is a web server software.    
+License:GPL    
+URL:    www.test.com    
+Source0:nginx-1.12.2.tar.gz
+#BuildRequires:    
+#Requires:    
+%description
+nginx [engine x] is an HTTP and reverse proxy server.
+%prep
+%setup –q                            //自动解压源码包，并cd进入目录
+%build
+./configure
+make %{?_smp_mflags}
+%install
+make install DESTDIR=%{buildroot}
+cp /root/rpmbuild/SPECS/nginx.sh %{buildroot}/usr/local/nginx/    
+##注意，cp非必须操作，注意，这里是将一个脚本拷贝到安装目录，必须提前准备该文件
+%files
+%doc
+/usr/local/nginx/*            //对哪些文件与目录打包
+%changelog
+
+使用配置文件创建RPM包
+1）安装依赖软件包
+	# yum -y install  gcc  pcre-devel zlib-devel openssl-devel
+2）rpmbuild创建RPM软件包
+	# rpmbuild -ba /root/rpmbuild/SPECS/nginx.spec
+	# ls /root/rpmbuild/RPMS/x86_64/nginx-1.12.2-10.x86_64.rpm
+	# rpm -qpi RPMS/x86_64/nginx-1.12.2-10.x86_64.rpm 
+Name        : nginx        Relocations: (not relocatable)
+Version     : 1.12.2        Vendor: (none)
+Release     : 10            Build Date: Mon 02 May 2016 02:30:53 AM PDT
+Install Date: (not installed)            Build Host: localhost
+Group       : Applications/Internet        Source RPM: nginx-1.8.0-1.src.rpm
+Size        : 721243                    License: GPL
+Signature   : (none)
+URL         : www.nginx.org
+Summary     : Nginx is a web server software.
+Description :
+nginx [engine x] is an HTTP and reverse proxy server.
+	# rpm -qpl nginx-1.12.2-10.x86_64.rpm 
+/usr
+/usr/local
+/usr/local/nginx
+/usr/local/nginx/conf
+/usr/local/nginx/conf/fastcgi.conf
+/usr/local/nginx/conf/fastcgi.conf.default
+/usr/local/nginx/conf/fastcgi_params
+/usr/local/nginx/conf/fastcgi_params.default
+/usr/local/nginx/conf/koi-utf
+/usr/local/nginx/conf/koi-win
+/usr/local/nginx/conf/mime.types
+/usr/local/nginx/conf/mime.types.default
+/usr/local/nginx/conf/nginx.conf
+/usr/local/nginx/conf/nginx.conf.default
+/usr/local/nginx/conf/scgi_params
+/usr/local/nginx/conf/scgi_params.default
+/usr/local/nginx/conf/uwsgi_params
+/usr/local/nginx/conf/uwsgi_params.default
+/usr/local/nginx/conf/win-utf
+/usr/local/nginx/html
+/usr/local/nginx/html/50x.html
+/usr/local/nginx/html/index.html
+/usr/local/nginx/logs
+/usr/local/nginx/sbin
+/usr/local/nginx/sbin/nginx
+
+安装、卸载软件
+	# rpm -ivh RPMS/x86_64/nginx-1.12.2-10.x86_64.rpm 
+	# rpm -qa |grep nginx
+	# /usr/local/nginx/sbin/nginx
+	# curl http://127.0.0.1/
+###############################################################################################
+总结答疑
+无法检出数据
+
+故障错误信息
+	# svn --username harry --password pass checkout svn://127.0.0.1/harry
+No repository found in 'svn://127.0.0.1'
+	# svn --username harry --password pass checkout svn://127.0.0.1/harry
+No access allowed to this repository
+	# svn --username harry --password pass checkout svn://127.0.0.1/harry
+AUthorization failed
+
+分析故障信息
+--No repository found in 'svn://127.0.0.1'
+--No access allowed to this repository
+--AUthorization failed
+分析故障原因
+--无法找到代码库，启动服务器时没有-r，客户端连接需要指定绝对路径
+--账户无权限访问代码库
+--authz文件没有正确定义账户对项目的权限
+--svn配置文件顶头不可以有空格
+
+创建或删除文件
+故障错误信息
+	# rm httpd
+	# mkdir test;touch test.txt
+	# svn commit -m "aa"
+分析故障信息
+--对版本库中的代码不可以直接使用命令删除或创建
+分析故障原因
+-- svn add可以创建文件
+-- svn mkdir可以创建目录
+-- svn del可以删除文件
+
